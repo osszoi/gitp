@@ -10,6 +10,89 @@ This project helps automate the process of generating Git commit messages using 
 
 ## Installation
 
-```
+```sh
 npm install -g gitp
 ```
+
+## Quickstart
+
+### Configure your OpenAI API key
+
+```sh
+gitp set-openai-key <your api key>
+```
+
+### Set a default ticket prefix
+
+```sh
+gitp set-default-ticket <your default ticket>
+```
+
+## Usage
+
+### Generate and commit changes
+
+To generate a commit message and description using OpenAI and commit the changes:
+
+```sh
+gitp commit
+```
+
+### Dry-run mode
+
+To simulate the OpenAI request without performing git operations:
+
+```sh
+gitp commit --dry-run
+```
+
+### Skip git commit hooks
+
+To skip git commit hooks during the commit:
+
+```sh
+gitp commit --no-verify
+```
+
+## Examples
+
+### Example 1: Basic commit
+
+```sh
+gitp commit
+```
+
+Output:
+```
+Message: Added new feature to handle user authentication
+Description: Implemented user login and registration functionality. Updated the database schema to include user credentials. Added unit tests for the new feature.
+```
+
+### Example 2: Dry-run mode
+
+```sh
+gitp commit --dry-run
+```
+
+Output:
+```
+Message: Added new feature to handle user authentication
+Description: Implemented user login and registration functionality. Updated the database schema to include user credentials. Added unit tests for the new feature.
+Dry-run enabled. Skipping commit and push.
+```
+
+### Example 3: Set OpenAI API key
+
+```sh
+gitp set-openai-key sk-your-api-key
+```
+
+### Example 4: Set default ticket prefix
+
+```sh
+gitp set-default-ticket TEST-0000
+```
+
+## License
+
+This project is licensed under the MIT License.
