@@ -47,28 +47,25 @@ async function generateCommit(diff, ticket) {
 
 async function commitCommand(cmd) {
 	try {
-		// Step 1: Check if the current directory is a git repository
 		const isGitRepo = await git.checkIsRepo();
 		if (!isGitRepo) {
-			logger('[red]This is not a Git repository.');
+			logger('[red]❌ This is not a Git repository.');
 			return;
 		}
 
-		// Step 2: Get Git status and current branch
 		const diff = await git.diff(); // ['--cached']
 		const branch = await git
 			.revparse(['--abbrev-ref', 'HEAD'])
 			.catch(() => null);
 		if (!branch) {
-			logger('[red]Unable to get current branch name.');
+			logger('[red]❌ Unable to get current branch name.');
 			return;
 		}
 
-		const ticket = extractTicketFromBranch(branch); // Extract ticket from branch name
-		logger(diff);
+		const ticket = extractTicketFromBranch(branch);
 
 		if (!diff.length) {
-			logger('[red]No changes to commit.');
+			logger('[red]❗ No changes to commit.');
 			return;
 		}
 
