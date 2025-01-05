@@ -15,11 +15,19 @@ function extractTicketFromBranch(branchName) {
 	const match = branchName.match(
 		/(?:feature|bugfix|hotfix|release)\/([A-Za-z]+-\d+)/
 	);
-	return match ? match[1] : 'NA-0000'; // Defaults to 'NA-0000' if no ticket found
+	return match
+		? match[1]
+		: credentials.defaultTicket?.length
+		? `${credentials.defaultTicket}: `
+		: '';
 }
 
 async function generateCommit(diff, ticket) {
-	const prompt = `Here is a list of changes detected in a Git repository:\n\n${diff}\n\nPlease generate separate and generate ONE commit. Be profesional, the result must compare to a Senior Developer. Be critic, no need to add 1 commit per file unless the context requires it. Be CONCISE and SHORT, no need to over explain anything, we're dealing with profesionals here. The commit must have a short and concise Git commit message prefixed with the Jira/GitHub/GitLab ticket (${ticket}) and a more detailed description of the changes for the commit.\n\nUse the following format for the output:\nCOMMIT_MESSAGE: <commit message here>\nCOMMIT_DESCRIPTION: <commit description here>\n\nPlease ONLY output what I asked, NO MORE text.`;
+  const ticketPart = ticket.length
+		? `prefixed with the Jira/GitHub/GitLab ticket (${ticket})`
+		: '';
+
+	const prompt = `Here is a list of changes detected in a Git repository:\n\n${diff}\n\nPlease generate separate and generate ONE commit. Be profesional, the result must compare to a Senior Developer. Be critic, no need to add 1 commit per file unless the context requires it. Be CONCISE and SHORT, no need to over explain anything, we're dealing with profesionals here. The commit must have a short and concise Git commit message ${ticketPart} and a more detailed description of the changes for the commit.\n\nUse the following format for the output:\nCOMMIT_MESSAGE: <commit message here>\nCOMMIT_DESCRIPTION: <commit description here>\n\nPlease ONLY output what I asked, NO MORE text.`;
 
 	const completion = await openai.chat.completions.create({
 		model: 'gpt-4o',
@@ -110,8 +118,14 @@ async function main() {
 		.command('set-openai-key <key>')
 		.description('Set the OpenAI API key')
 		.action((key) => {
-			saveCredentials({ openAiApiKey: key });
-			logger('OpenAI API key saved!');
+			saveCredentials({ ...credentials, openAiApiKey: key });
+		});
+
+	program
+		.command('set-default-ticket <ticket>')
+		.description('Set the default ticket when no ticket is found')
+		.action((ticket) => {
+			saveCredentials({ ...credentials, defaultTicket: ticket });
 		});
 
 	program.parse(process.argv);
