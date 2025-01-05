@@ -84,7 +84,7 @@ async function commitCommand(cmd) {
 
 		await git.add('.');
 
-		let commitArgs = `${ticket}: ${commitMessage}\n\n${commitDescription}`;
+		let commitArgs = `${commitMessage}\n\n${commitDescription}`;
 		if (cmd.verify) {
 			commitArgs += ' --no-verify';
 		}
