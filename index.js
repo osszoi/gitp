@@ -1,7 +1,7 @@
 const { Command } = require('commander');
 const OpenAI = require('openai');
 const simpleGit = require('simple-git');
-const fs = require('fs');
+const logger = require('./log');
 
 // Load API key from environment variables or a config file
 const { loadCredentials, saveCredentials } = require('./apikey.js');
@@ -50,25 +50,25 @@ async function commitCommand(cmd) {
 		// Step 1: Check if the current directory is a git repository
 		const isGitRepo = await git.checkIsRepo();
 		if (!isGitRepo) {
-			console.log('This is not a Git repository.');
+			logger('[red]This is not a Git repository.');
 			return;
 		}
 
 		// Step 2: Get Git status and current branch
-		const diff = await git.diff();
+		const diff = await git.diff(); // ['--cached']
 		const branch = await git
 			.revparse(['--abbrev-ref', 'HEAD'])
 			.catch(() => null);
 		if (!branch) {
-			console.log('Unable to get current branch name.');
+			logger('[red]Unable to get current branch name.');
 			return;
 		}
 
 		const ticket = extractTicketFromBranch(branch); // Extract ticket from branch name
-		console.log(diff);
+		logger(diff);
 
 		if (!diff.length) {
-			console.log('No changes to commit.');
+			logger('[red]No changes to commit.');
 			return;
 		}
 
@@ -77,11 +77,11 @@ async function commitCommand(cmd) {
 			ticket
 		);
 
-		console.log('Message: ', commitMessage);
-		console.log('Description: ', commitDescription);
+		logger(`[green]Message: [white] ${commitMessage}`);
+		logger(`[green]Description: [white]${commitDescription}`);
 
 		if (cmd['dry-run']) {
-			console.log('Dry-run enabled. Skipping commit and push.');
+			logger('[gray]Dry-run enabled. Skipping commit and push.');
 			return;
 		}
 
@@ -95,7 +95,6 @@ async function commitCommand(cmd) {
 		await git.commit(commitArgs);
 
 		await git.push('origin', branch);
-		console.log('Batch committed and pushed successfully!');
 	} catch (error) {
 		console.error('Error:', error.message);
 	}
@@ -115,7 +114,7 @@ async function main() {
 		.description('Set the OpenAI API key')
 		.action((key) => {
 			saveCredentials({ openAiApiKey: key });
-			console.log('OpenAI API key saved!');
+			logger('OpenAI API key saved!');
 		});
 
 	program.parse(process.argv);
