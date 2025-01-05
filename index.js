@@ -77,15 +77,15 @@ async function commitCommand(cmd) {
 		logger(`[green]Message: [white] ${commitMessage}`);
 		logger(`[green]Description: [white]${commitDescription}`);
 
-		if (cmd['dry-run']) {
-			logger('[gray]Dry-run enabled. Skipping commit and push.');
+		if (cmd.dryRun) {
+			logger('[yellow]Dry-run enabled. Skipping commit and push.');
 			return;
 		}
 
 		await git.add('.');
 
 		let commitArgs = `${ticket}: ${commitMessage}\n\n${commitDescription}`;
-		if (cmd['no-verify']) {
+		if (cmd.verify) {
 			commitArgs += ' --no-verify';
 		}
 
@@ -102,8 +102,8 @@ async function main() {
 
 	program
 		.command('commit')
-		.option('--dry-run', 'Perform OpenAI request without git operations')
-		.option('--no-verify', 'Skip git commit hooks')
+		.option('--dry-run', 'Perform OpenAI request without git operations', false)
+		.option('--no-verify', 'Skip git commit hooks', false)
 		.action(commitCommand);
 
 	program
