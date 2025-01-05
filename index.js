@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 const { Command } = require('commander');
 const OpenAI = require('openai');
 const simpleGit = require('simple-git');
@@ -23,7 +25,7 @@ function extractTicketFromBranch(branchName) {
 }
 
 async function generateCommit(diff, ticket) {
-  const ticketPart = ticket.length
+	const ticketPart = ticket.length
 		? `prefixed with the Jira/GitHub/GitLab ticket (${ticket})`
 		: '';
 
