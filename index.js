@@ -100,8 +100,6 @@ async function commitCommand(cmd) {
 		}
 
 		await git.commit(commitArgs);
-
-		await git.push('origin', branch);
 	} catch (error) {
 		console.error('Error:', error.message);
 	}
