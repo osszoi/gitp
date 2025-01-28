@@ -10,7 +10,7 @@
   },
   "author": "Eduardo Lorenzo <ejlorenzo19@gmail.com>",
   "license": "MIT",
-  "description": "",
+  "description": "A CLI tool that uses AI to automatically generate meaningful git commit messages based on your changes",
   "repository": {
     "type": "git",
     "url": "https://github.com/osszoi/gitp"

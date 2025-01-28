@@ -16,16 +16,22 @@ npm install -g gitp
 
 ## Quickstart
 
-### Configure your OpenAI API key
+### Configure your API key
 
+##### OpenAI
 ```sh
 gitp set-openai-key <your api key>
+```
+
+##### Deepseek
+```sh
+gitp set-deepseek-key <your api key>
 ```
 
 ### Set a default ticket prefix
 
 ```sh
-gitp set-default-ticket <your default ticket>
+gitp set-default-ticket-for <path> <ticket>
 ```
 
 ## Usage
@@ -40,7 +46,7 @@ gitp commit
 
 ### Dry-run mode
 
-To simulate the OpenAI request without performing git operations:
+To simulate the request without performing git operations:
 
 ```sh
 gitp commit --dry-run
@@ -81,17 +87,28 @@ Description: Implemented user login and registration functionality. Updated the 
 Dry-run enabled. Skipping commit and push.
 ```
 
-### Example 3: Set OpenAI API key
+### Example 3: Set API key
 
+##### OpenAI
 ```sh
 gitp set-openai-key sk-your-api-key
 ```
 
-### Example 4: Set default ticket prefix
+##### Deepseek
+```sh
+gitp set-deepseek-key sk-your-api-key
+```
+
+**Note**: Currently hardcoded to use Deepseek API key.
+
+### Example 4: Set default ticket prefix per path
 
 ```sh
-gitp set-default-ticket TEST-0000
+gitp set-default-ticket-for project1 PROJECT1-0000
 ```
+
+You can set as many as you want.
+
 
 ## License
 
