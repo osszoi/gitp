@@ -13,14 +13,14 @@ const credentials = loadCredentials();
 const deepseekConfig = {
 	config: {
 		baseURL: 'https://api.deepseek.com',
-		apiKey: credentials.deepseekApiKey
+		apiKey: credentials.deepseekApiKey || ''
 	},
 	model: 'deepseek-chat'
 };
 
 const chatGptConfig = {
 	config: {
-		apiKey: credentials.openAiApiKey
+		apiKey: credentials.openAiApiKey || ''
 	},
 	model: 'gpt-4o'
 };
