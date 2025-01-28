@@ -6,9 +6,9 @@ const simpleGit = require('simple-git');
 const logger = require('./log');
 
 // Load API key from environment variables or a config file
-const { loadCredentials, saveCredentials } = require('./apikey.js');
+const { loadCredentials, saveCredentials } = require('@edjl/config');
 
-const credentials = loadCredentials();
+const credentials = loadCredentials('gitp');
 
 const deepseekConfig = {
 	config: {
@@ -138,28 +138,28 @@ async function main() {
 		.command('set-openai-key <key>')
 		.description('Set the OpenAI API key')
 		.action((key) => {
-			saveCredentials({ ...credentials, openAiApiKey: key });
+			saveCredentials('gitp', { ...credentials, openAiApiKey: key });
 		});
 
 	program
 		.command('set-deepseek-key <key>')
 		.description('Set the DeepSeek API key')
 		.action((key) => {
-			saveCredentials({ ...credentials, deepseekApiKey: key });
+			saveCredentials('gitp', { ...credentials, deepseekApiKey: key });
 		});
 
 	program
 		.command('set-default-ticket <ticket>')
 		.description('Set the default ticket when no ticket is found')
 		.action((ticket) => {
-			saveCredentials({ ...credentials, defaultTicket: ticket });
+			saveCredentials('gitp', { ...credentials, defaultTicket: ticket });
 		});
 
 	program
 		.command('set-default-ticket-for <path> <ticket>')
 		.description('Set the default ticket for a specific path')
 		.action((path, ticket) => {
-			saveCredentials({
+			saveCredentials('gitp', {
 				...credentials,
 				defaultTicketFor: [
 					...(credentials.defaultTicketFor || []),
