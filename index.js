@@ -33,11 +33,15 @@ function extractTicketFromBranch(branchName) {
 	const match = branchName.match(
 		/(?:feature|bugfix|hotfix|release)\/([A-Za-z]+-\d+)/
 	);
-	return match
-		? match[1]
-		: credentials.defaultTicket?.length
-		? `${credentials.defaultTicket}: `
-		: '';
+
+	// Current path
+	const currentPath = process.cwd();
+	const defaultTicketFor =
+		(credentials.defaultTicketFor || []).find((item) =>
+			currentPath.includes(item.path)
+		)?.ticket || '';
+
+	return match ? match[1] : defaultTicketFor;
 }
 
 async function generateCommit(diff, ticket) {
@@ -149,6 +153,19 @@ async function main() {
 		.description('Set the default ticket when no ticket is found')
 		.action((ticket) => {
 			saveCredentials({ ...credentials, defaultTicket: ticket });
+		});
+
+	program
+		.command('set-default-ticket-for <path> <ticket>')
+		.description('Set the default ticket for a specific path')
+		.action((path, ticket) => {
+			saveCredentials({
+				...credentials,
+				defaultTicketFor: [
+					...(credentials.defaultTicketFor || []),
+					{ path, ticket }
+				]
+			});
 		});
 
 	program.parse(process.argv);
