@@ -138,6 +138,13 @@ async function main() {
 		});
 
 	program
+		.command('set-deepseek-key <key>')
+		.description('Set the DeepSeek API key')
+		.action((key) => {
+			saveCredentials({ ...credentials, deepseekApiKey: key });
+		});
+
+	program
 		.command('set-default-ticket <ticket>')
 		.description('Set the default ticket when no ticket is found')
 		.action((ticket) => {
