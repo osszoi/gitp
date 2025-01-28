@@ -9,7 +9,23 @@ const logger = require('./log');
 const { loadCredentials, saveCredentials } = require('./apikey.js');
 
 const credentials = loadCredentials();
-const openai = new OpenAI({ apiKey: credentials.openAiApiKey });
+
+const deepseekConfig = {
+	config: {
+		baseURL: 'https://api.deepseek.com',
+		apiKey: credentials.deepseekApiKey
+	},
+	model: 'deepseek-chat'
+};
+
+const chatGptConfig = {
+	config: {
+		apiKey: credentials.openAiApiKey
+	},
+	model: 'gpt-4o'
+};
+
+const openai = new OpenAI(deepseekConfig.config);
 const git = simpleGit();
 
 // Extract Jira/GitHub/GitLab ticket from the branch name
@@ -32,7 +48,7 @@ async function generateCommit(diff, ticket) {
 	const prompt = `Here is a list of changes detected in a Git repository:\n\n${diff}\n\nPlease generate separate and generate ONE commit. Be profesional, the result must compare to a Senior Developer. Be critic, no need to add 1 commit per file unless the context requires it. Be CONCISE and SHORT, no need to over explain anything, we're dealing with profesionals here. The commit must have a short and concise Git commit message ${ticketPart} and a more detailed description of the changes for the commit.\n\nUse the following format for the output:\nCOMMIT_MESSAGE: <commit message here>\nCOMMIT_DESCRIPTION: <commit description here>\n\nPlease ONLY output what I asked, NO MORE text.`;
 
 	const completion = await openai.chat.completions.create({
-		model: 'gpt-4o',
+		model: deepseekConfig.model,
 		messages: [{ role: 'user', content: prompt }]
 	});
 
