@@ -10,22 +10,22 @@ const { loadCredentials, saveCredentials } = require('@edjl/config');
 
 const credentials = loadCredentials('gitp');
 
-const deepseekConfig = {
-	config: {
-		baseURL: 'https://api.deepseek.com',
-		apiKey: credentials.deepseekApiKey || ''
+const providers = {
+	deepseek: {
+		config: {
+			baseURL: 'https://api.deepseek.com',
+			apiKey: credentials.deepseekApiKey || ''
+		},
+		model: 'deepseek-chat'
 	},
-	model: 'deepseek-chat'
+	gpt: {
+		config: {
+			apiKey: credentials.openAiApiKey || ''
+		},
+		model: 'gpt-4o'
+	}
 };
 
-const chatGptConfig = {
-	config: {
-		apiKey: credentials.openAiApiKey || ''
-	},
-	model: 'gpt-4o'
-};
-
-const openai = new OpenAI(deepseekConfig.config);
 const git = simpleGit();
 
 // Extract Jira/GitHub/GitLab ticket from the branch name
@@ -45,6 +45,15 @@ function extractTicketFromBranch(branchName) {
 }
 
 async function generateCommit(diff, ticket) {
+	const provider = providers[credentials.provider];
+
+	if (!provider) {
+		logger('[red]❌ No provider selected.');
+		return {};
+	}
+
+	const openai = new OpenAI(provider.config);
+
 	const ticketPart = ticket.length
 		? `prefixed with the Jira/GitHub/GitLab ticket (${ticket})`
 		: '';
@@ -103,6 +112,10 @@ async function commitCommand(cmd) {
 			diff,
 			ticket
 		);
+
+		if (!commitMessage) {
+			return;
+		}
 
 		logger(`[green]Message: [white] ${commitMessage}`);
 		logger(`[green]Description: [white]${commitDescription}`);
@@ -165,6 +178,16 @@ async function main() {
 					...(credentials.defaultTicketFor || []),
 					{ path, ticket }
 				]
+			});
+		});
+
+	program
+		.command('set-provider <provider>')
+		.description('Set the provider')
+		.action((provider) => {
+			saveCredentials('gitp', {
+				...credentials,
+				provider
 			});
 		});
 

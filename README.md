@@ -34,6 +34,12 @@ gitp set-deepseek-key <your api key>
 gitp set-default-ticket-for <path> <ticket>
 ```
 
+### Set a default provider
+
+```sh
+gitp set-provider <provider>
+```
+
 ## Usage
 
 ### Generate and commit changes
@@ -109,6 +115,15 @@ gitp set-default-ticket-for project1 PROJECT1-0000
 
 You can set as many as you want.
 
+### Example 5: Set provider
+
+```sh
+gitp set-provider openai
+```
+
+```sh
+gitp set-provider deepseek
+```
 
 ## License
 
