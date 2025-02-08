@@ -28,6 +28,15 @@ gitp set-openai-key <your api key>
 gitp set-deepseek-key <your api key>
 ```
 
+### Set up Git aliases
+To create convenient git aliases for gitp commands:
+```sh
+gitp add-alias
+```
+This will add:
+- `git c` as an alias for `gitp commit`
+- `git ca` as an alias for `gitp commit --add`
+
 ### Set a default ticket prefix
 
 ```sh
