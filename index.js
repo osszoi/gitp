@@ -92,7 +92,11 @@ async function commitCommand(cmd) {
 			return;
 		}
 
-		const diff = await git.diff(); // ['--cached']
+		if (cmd.add) {
+			await git.add('.');
+		}
+
+		const diff = await git.diff(['--cached']); // ['--cached']
 		const branch = await git
 			.revparse(['--abbrev-ref', 'HEAD'])
 			.catch(() => null);
@@ -104,7 +108,9 @@ async function commitCommand(cmd) {
 		const ticket = extractTicketFromBranch(branch);
 
 		if (!diff.length) {
-			logger('[red]❗ No changes to commit.');
+			logger(
+				'[red]❗ No changes to commit. If they are not staged, run [yellow]git add .[red] first or use the [yellow]--add[red] flag.'
+			);
 			return;
 		}
 
@@ -125,9 +131,8 @@ async function commitCommand(cmd) {
 			return;
 		}
 
-		await git.add('.');
-
 		let commitArgs = `${commitMessage}\n\n${commitDescription}`;
+
 		if (cmd.verify) {
 			commitArgs += ' --no-verify';
 		}
@@ -145,6 +150,7 @@ async function main() {
 		.command('commit')
 		.option('--dry-run', 'Perform OpenAI request without git operations', false)
 		.option('--no-verify', 'Skip git commit hooks', false)
+		.option('--add', 'Automatically add changes to the staging area', false)
 		.action(commitCommand);
 
 	program
