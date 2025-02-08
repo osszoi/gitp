@@ -143,6 +143,25 @@ async function commitCommand(cmd) {
 	}
 }
 
+async function addAliasToGitConfig() {
+	const { exec } = require('child_process');
+
+	return new Promise((resolve, reject) => {
+		exec('git config --global alias.c "!gitp commit"', (error) => {
+			if (error) return reject(error);
+			exec('git config --global alias.ca "!gitp commit --add"', (error) => {
+				if (error) return reject(error);
+				resolve();
+			});
+		});
+	}).finally(() => {
+		logger('[green]✅ Aliases added to git config.');
+		logger(
+			'[yellow]You can now use [green]git c[yellow] and [green]git ca[yellow] to commit and commit with add respectively.'
+		);
+	});
+}
+
 async function main() {
 	const program = new Command();
 
@@ -196,6 +215,11 @@ async function main() {
 				provider
 			});
 		});
+
+	program
+		.command('add-alias')
+		.description('Add aliases to the git config')
+		.action(addAliasToGitConfig);
 
 	program.parse(process.argv);
 }
