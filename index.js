@@ -197,12 +197,24 @@ async function main() {
 		.command('set-default-ticket-for <path> <ticket>')
 		.description('Set the default ticket for a specific path')
 		.action((path, ticket) => {
+			const current = credentials.defaultTicketFor || [];
+			let final = [];
+
+			if (current.find((item) => item.path === path)) {
+				final = current.map((item) => {
+					if (item.path === path) {
+						return { path, ticket };
+					}
+
+					return item;
+				});
+			} else {
+				final = [...current, { path, ticket }];
+			}
+
 			saveCredentials('gitp', {
 				...credentials,
-				defaultTicketFor: [
-					...(credentials.defaultTicketFor || []),
-					{ path, ticket }
-				]
+				defaultTicketFor: final
 			});
 		});
 
