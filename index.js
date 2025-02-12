@@ -169,8 +169,33 @@ async function addAliasToGitConfig() {
 	});
 }
 
+async function checkForUpdates() {
+	try {
+		const response = await fetch('https://registry.npmjs.org/git-gpt/latest');
+		if (!response.ok) {
+			throw new Error(`HTTP error! Status: ${response.status}`);
+		}
+
+		const latestVersion = await response.json();
+		return latestVersion.version;
+	} catch (error) {
+		logger(`[red]❌ Error fetching latest version: ${error.message}`);
+	}
+}
+
 async function main() {
 	const program = new Command();
+
+	// Check if there is a new version
+	const latestVersion = await checkForUpdates();
+	const currentVersion = require('./package.json').version;
+	console.log({ latestVersion, currentVersion });
+
+	if (latestVersion && latestVersion !== currentVersion) {
+		logger(
+			`[yellow]A new version of gitp is available. Please update to the latest version by running [green]npm install -g git-gpt[yellow].`
+		);
+	}
 
 	program
 		.command('commit')
