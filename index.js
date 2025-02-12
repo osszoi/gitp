@@ -189,7 +189,6 @@ async function main() {
 	// Check if there is a new version
 	const latestVersion = await checkForUpdates();
 	const currentVersion = require('./package.json').version;
-	console.log({ latestVersion, currentVersion });
 
 	if (latestVersion && latestVersion !== currentVersion) {
 		logger(
