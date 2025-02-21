@@ -18,6 +18,7 @@
   "dependencies": {
     "@edjl/config": "^0.0.1",
     "commander": "^13.0.0",
+    "inquirer": "^12.4.2",
     "openai": "^4.77.3",
     "simple-git": "^3.27.0"
   }

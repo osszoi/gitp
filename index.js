@@ -4,6 +4,7 @@ const { Command } = require('commander');
 const OpenAI = require('openai');
 const simpleGit = require('simple-git');
 const logger = require('./log');
+const inquirer = require('inquirer').default;
 
 // Load API key from environment variables or a config file
 const { loadCredentials, saveCredentials } = require('@edjl/config');
@@ -136,24 +137,56 @@ async function commitCommand(cmd) {
 			return;
 		}
 
-		const { commitMessage, commitDescription } = await generateCommit(
-			diff,
-			ticket
-		);
+		let userSatisfied = false;
+		let finalCommitMessage = '';
+		let finalCommitDescription = '';
+		let attemptCount = 0;
+		while (!userSatisfied && attemptCount < 10) {
+			const { commitMessage, commitDescription } = await generateCommit(
+				diff,
+				ticket
+			);
+			if (!commitMessage) return;
+			logger(`\n\n[green]Message: [white] ${commitMessage}`);
+			logger(`[green]Description: [white] ${commitDescription}`);
 
-		if (!commitMessage) {
-			return;
+			if (cmd.y) {
+				finalCommitMessage = commitMessage;
+				finalCommitDescription = commitDescription;
+				userSatisfied = true;
+				break;
+			}
+
+			const answers = await inquirer.prompt([
+				{
+					type: 'confirm',
+					name: 'confirm',
+					// message: `Do you accept this commit message and description?\n\nMessage: ${commitMessage}\nDescription: ${commitDescription}`,
+					message: `Do you accept this commit message and description?`,
+					default: true
+				}
+			]);
+
+			if (answers.confirm) {
+				finalCommitMessage = commitMessage;
+				finalCommitDescription = commitDescription;
+				userSatisfied = true;
+			} else {
+				attemptCount++;
+			}
 		}
 
-		logger(`[green]Message: [white] ${commitMessage}`);
-		logger(`[green]Description: [white]${commitDescription}`);
+		if (!userSatisfied) {
+			logger('[yellow]Proceeding with the last generated commit message.');
+		}
+		if (!finalCommitMessage) return;
 
 		if (cmd.dryRun) {
 			logger('[yellow]Dry-run enabled. Skipping commit and push.');
 			return;
 		}
 
-		let commitArgs = `${commitMessage}\n\n${commitDescription}`;
+		let commitArgs = `${finalCommitMessage}\n\n${finalCommitDescription}`;
 
 		if (cmd.verify) {
 			commitArgs += ' --no-verify';
@@ -161,7 +194,7 @@ async function commitCommand(cmd) {
 
 		await git.commit(commitArgs);
 	} catch (error) {
-		console.error('Error:', error.message);
+		logger('❌ Error:', error.message);
 	}
 }
 
@@ -169,9 +202,9 @@ async function addAliasToGitConfig() {
 	const { exec } = require('child_process');
 
 	return new Promise((resolve, reject) => {
-		exec('git config --global alias.c "!gitp commit"', (error) => {
+		exec('git config --global alias.c "!gitp commit $*"', (error) => {
 			if (error) return reject(error);
-			exec('git config --global alias.ca "!gitp commit --add"', (error) => {
+			exec('git config --global alias.ca "!gitp commit --add $*"', (error) => {
 				if (error) return reject(error);
 				resolve();
 			});
@@ -216,6 +249,7 @@ async function main() {
 		.option('--dry-run', 'Perform OpenAI request without git operations', false)
 		.option('--no-verify', 'Skip git commit hooks', false)
 		.option('--add', 'Automatically add changes to the staging area', false)
+		.option('-y', 'Skip user confirmation', false)
 		.action(commitCommand);
 
 	program
