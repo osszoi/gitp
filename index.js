@@ -51,14 +51,14 @@ async function generateCommit(diff, ticket) {
 		logger('[red]❌ No provider selected.');
 		return {};
 	}
-
 	const openai = new OpenAI(provider.config);
 
 	const ticketPart = ticket.length
 		? `prefixed with the Jira/GitHub/GitLab ticket (${ticket})`
 		: '';
 
-	const prompt = `Yo, here's what changed in the repo:\n\n${diff}\n\nI need a single commit message for this. Keep it short and to the point—no fluff. If multiple files changed but it's all related, roll it into one commit. If something really needs extra detail, fine, but keep it minimal. The message should be something a senior dev would write, no over-explaining. ${
+	// Base prompt without the iterative reminder.
+	const basePrompt = `Yo, here's what changed in the repo:\n\n${diff}\n\nI need a single commit message for this. Keep it short and to the point—no fluff. If multiple files changed but it's all related, roll it into one commit. If something really needs extra detail, fine, but keep it minimal. The message should be something a senior dev would write, no over-explaining. ${
 		ticketPart ? `Prefix it with the ticket (${ticket}) if applicable.` : ''
 	}
 		Format it like this:
@@ -67,26 +67,41 @@ async function generateCommit(diff, ticket) {
 
 		ONLY return what I asked, nothing else.`;
 
-	const completion = await openai.chat.completions.create({
-		model: provider.model,
-		messages: [{ role: 'user', content: prompt }]
-	});
-
-	const commit = completion.choices[0].message.content
-		.trim()
-		.split('\n')
-		.map((line) => line.trim());
-
 	let commitMessage = '';
 	let commitDescription = '';
+	let promptIterationCount = 0;
 
-	commit.forEach((line) => {
-		if (line.startsWith('COMMIT_MESSAGE:')) {
-			commitMessage = line.replace('COMMIT_MESSAGE:', '').trim();
-		} else if (line.startsWith('COMMIT_DESCRIPTION:')) {
-			commitDescription = line.replace('COMMIT_DESCRIPTION:', '').trim();
+	while (promptIterationCount < 10) {
+		const prompt =
+			basePrompt +
+			(promptIterationCount > 0
+				? `\nRemember: Commit message MUST be <=50 characters (including ticket).`
+				: '');
+
+		const completion = await openai.chat.completions.create({
+			model: provider.model,
+			messages: [{ role: 'user', content: prompt }]
+		});
+
+		const commit = completion.choices[0].message.content
+			.trim()
+			.split('\n')
+			.map((line) => line.trim());
+
+		commitMessage = '';
+		commitDescription = '';
+		commit.forEach((line) => {
+			if (line.startsWith('COMMIT_MESSAGE:')) {
+				commitMessage = line.replace('COMMIT_MESSAGE:', '').trim();
+			} else if (line.startsWith('COMMIT_DESCRIPTION:')) {
+				commitDescription = line.replace('COMMIT_DESCRIPTION:', '').trim();
+			}
+		});
+		if (commitMessage.length <= 50) {
+			break;
 		}
-	});
+		promptIterationCount++;
+	}
 
 	return { commitMessage, commitDescription };
 }
