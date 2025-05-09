@@ -1,0 +1,33 @@
+name: Publish
+on:
+  push:
+    branches: [master]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org/
+
+      - name: Configure Git
+        run: |
+          git config user.name "GitHub Actions Bot"
+          git config user.email "actions@github.com"
+
+      - name: Bump version, commit, and tag
+        run: 'npm version patch -m "release %s [skip ci]"'
+
+      - name: Push version commit and tag
+        run: git push --follow-tags
+
+      - run: npm install
+      - run: npm run release
+        env:
+          NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}

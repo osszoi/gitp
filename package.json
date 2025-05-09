@@ -6,7 +6,7 @@
     "gitp": "./index.js"
   },
   "scripts": {
-    "release": "gitp commit && npm version minor && git push && npm publish"
+    "release": "npm publish"
   },
   "author": "Eduardo Lorenzo <ejlorenzo19@gmail.com>",
   "license": "MIT",
