@@ -10,6 +10,8 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -21,13 +23,11 @@ jobs:
           git config user.name "GitHub Actions Bot"
           git config user.email "actions@github.com"
 
-      - name: Bump version, commit, and tag
-        run: 'npm version patch -m "release %s [skip ci]"'
+      - name: Install dependencies
+        run: npm install
 
-      - name: Push version commit and tag
-        run: git push --follow-tags
-
-      - run: npm install
-      - run: npm run release
+      - name: Release with release-it
+        run: npx release-it patch --ci
         env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
