@@ -5,27 +5,12 @@ const OpenAI = require('openai');
 const simpleGit = require('simple-git');
 const logger = require('./log');
 const inquirer = require('inquirer').default;
+const { query } = require('llm-querier');
 
 // Load API key from environment variables or a config file
 const { loadCredentials, saveCredentials } = require('@edjl/config');
 
 const credentials = loadCredentials('gitp');
-
-const providers = {
-	deepseek: {
-		config: {
-			baseURL: 'https://api.deepseek.com',
-			apiKey: credentials.deepseekApiKey || ''
-		},
-		model: 'deepseek-chat'
-	},
-	gpt: {
-		config: {
-			apiKey: credentials.openAiApiKey || ''
-		},
-		model: 'gpt-4o'
-	}
-};
 
 const git = simpleGit();
 
@@ -46,37 +31,59 @@ function extractTicketFromBranch(branchName) {
 }
 
 async function generateCommit(diff, ticket) {
-	const provider = providers[credentials.provider];
+	const provider = credentials.provider;
+	const model = credentials.model;
+	const apiKey = credentials.apiKey;
 
 	if (!provider) {
 		logger('[red]❌ No provider selected.');
 		return {};
 	}
-	const openai = new OpenAI(provider.config);
 
-	// Base prompt without the iterative reminder.
-	const basePrompt = `Yo, here's what changed in the repo:\n\n${diff}\n\nI need a single commit message for this. Keep it short and to the point. If multiple files changed but it's all related, roll it into one commit. If something really needs extra detail, fine, but keep it minimal. The message should be something a senior dev would write, no over-explaining.
+	if (!apiKey) {
+		logger('[red]❌ No API key provided.');
+		return {};
+	}
 
-		Format it like this:
-		COMMIT_MESSAGE: <commit message here>
-		COMMIT_DESCRIPTION: <commit description here>
+	if (!model) {
+		logger('[red]❌ No model selected.');
+		return {};
+	}
 
-		ONLY return what I asked, nothing else.`;
+	const result = await query({
+		model,
+		provider,
+		apiKey,
+		prompt: `
+			# Task
+			Generate a commit message and a commit description
 
-	let commitMessage = '';
-	let commitDescription = '';
+			# How to
+			Use the provided context to generate the commit message and description. In the context section you will find the diff of the changes.
 
-	const prompt = basePrompt;
+			# Considerations
+			- The commit message should be very short and straight to the point.
+			- The commit description should be a more detailed explanation of the changes.
 
-	const completion = await openai.chat.completions.create({
-		model: provider.model,
-		messages: [{ role: 'user', content: prompt }]
+			# Format
+			The output format should consist of two lines, prefixed with "COMMIT_MESSAGE" for the commit message and "COMMIT_DESCRIPTION" for the commit description, like this:
+			COMMIT_MESSAGE: <commit message here>
+			COMMIT_DESCRIPTION: <commit description here>
+		`,
+		context: [diff],
+		examples: [
+			`
+				COMMIT_MESSAGE: Add a new feature
+				COMMIT_DESCRIPTION: This commit adds a new feature to the project.
+			`,
+			`
+				COMMIT_MESSAGE: Fix a bug
+				COMMIT_DESCRIPTION: This commit fixes a bug in the project.
+			`
+		]
 	});
 
-	const commit = completion.choices[0].message.content
-		.trim()
-		.split('\n')
-		.map((line) => line.trim());
+	const commit = result.split('\n').map((line) => line.trim());
 
 	commitMessage = '';
 	commitDescription = '';
@@ -239,17 +246,10 @@ async function main() {
 		.action(commitCommand);
 
 	program
-		.command('set-openai-key <key>')
-		.description('Set the OpenAI API key')
-		.action((key) => {
-			saveCredentials('gitp', { ...credentials, openAiApiKey: key });
-		});
-
-	program
-		.command('set-deepseek-key <key>')
-		.description('Set the DeepSeek API key')
-		.action((key) => {
-			saveCredentials('gitp', { ...credentials, deepseekApiKey: key });
+		.command('set-api-key <key>')
+		.description('Set the API key')
+		.action((apiKey) => {
+			saveCredentials('gitp', { ...credentials, apiKey });
 		});
 
 	program
@@ -291,6 +291,16 @@ async function main() {
 			saveCredentials('gitp', {
 				...credentials,
 				provider
+			});
+		});
+
+	program
+		.command('set-model <model>')
+		.description('Set the model')
+		.action((model) => {
+			saveCredentials('gitp', {
+				...credentials,
+				model
 			});
 		});
 
