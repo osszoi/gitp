@@ -16,16 +16,22 @@ npm install -g gitp
 
 ## Quickstart
 
-### Configure your API key
+### Configure your settings
 
-##### OpenAI
+##### Set API Key
 ```sh
-gitp set-openai-key <your api key>
+gitp set-api-key <your api key>
 ```
 
-##### Deepseek
+##### Set Provider
 ```sh
-gitp set-deepseek-key <your api key>
+gitp set-provider <provider>
+```
+Available providers: google, openai, deepseek
+
+##### Set Model
+```sh
+gitp set-model <model>
 ```
 
 ### Set up Git aliases
@@ -43,17 +49,11 @@ This will add:
 gitp set-default-ticket-for <path> <ticket>
 ```
 
-### Set a default provider
-
-```sh
-gitp set-provider <provider>
-```
-
 ## Usage
 
 ### Generate and commit changes
 
-To generate a commit message and description using OpenAI and commit the changes:
+To generate a commit message and description using the configured provider and commit the changes:
 
 ```sh
 gitp commit
@@ -104,17 +104,9 @@ Dry-run enabled. Skipping commit and push.
 
 ### Example 3: Set API key
 
-##### OpenAI
 ```sh
-gitp set-openai-key sk-your-api-key
+gitp set-api-key sk-your-api-key
 ```
-
-##### Deepseek
-```sh
-gitp set-deepseek-key sk-your-api-key
-```
-
-**Note**: Currently hardcoded to use Deepseek API key.
 
 ### Example 4: Set default ticket prefix per path
 
@@ -124,14 +116,16 @@ gitp set-default-ticket-for project1 PROJECT1-0000
 
 You can set as many as you want.
 
-### Example 5: Set provider
+### Example 5: Set provider and model
 
 ```sh
 gitp set-provider openai
+gitp set-model gpt-4
 ```
 
 ```sh
 gitp set-provider deepseek
+gitp set-model deepseek-coder
 ```
 
 ## License
