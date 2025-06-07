@@ -30,7 +30,7 @@ function extractTicketFromBranch(branchName) {
 	return match ? match[1] : defaultTicketFor;
 }
 
-async function generateCommit(diff, ticket) {
+async function generateCommit(diff, ticket, history = []) {
 	const provider = credentials.provider;
 	const model = credentials.model;
 	const apiKey = credentials.apiKey;
@@ -50,35 +50,52 @@ async function generateCommit(diff, ticket) {
 		return {};
 	}
 
+	let historyContext = '';
+	if (history.length > 0) {
+		historyContext = '\n\n# Previous attempts and feedback:\n';
+		history.forEach((attempt, index) => {
+			historyContext += `\nAttempt ${index + 1}:\n`;
+			historyContext += `Message: ${attempt.message}\n`;
+			historyContext += `Description: ${attempt.description}\n`;
+			historyContext += `User feedback: ${attempt.feedback}\n`;
+		});
+	}
+
 	const result = await query({
 		model,
 		provider,
 		apiKey,
 		prompt: `
 			# Task
-			Generate a commit message and a commit description
+			Generate a commit message and a commit description for code changes
 
 			# How to
 			Use the provided context to generate the commit message and description. In the context section you will find the diff of the changes.
 
-			# Considerations
-			- The commit message should be very short and straight to the point.
-			- The commit description should be a more detailed explanation of the changes.
+			# CRITICAL Requirements
+			- DO NOT use conventional commit prefixes like "feat:", "fix:", "chore:", "docs:", "style:", "refactor:", "test:", "build:", etc.
+			- Start the commit message directly with the action verb (e.g., "Add", "Update", "Fix", "Implement", "Refactor")
+			- Write as a SENIOR DEVELOPER would - professional, concise, and technically accurate
+			- The commit message should be very short and straight to the point (max 50 characters)
+			- The commit description should provide meaningful technical context about WHY the changes were made, not just WHAT was changed
+			- AVOID stating obvious file changes like "updated package.json" or "modified index.js"
+			- Focus on the business logic, architectural decisions, or problem being solved
+			- Think about what a developer reading this commit in 6 months would need to know
 
 			# Format
 			The output format should consist of two lines, prefixed with "COMMIT_MESSAGE" for the commit message and "COMMIT_DESCRIPTION" for the commit description, like this:
 			COMMIT_MESSAGE: <commit message here>
-			COMMIT_DESCRIPTION: <commit description here>
+			COMMIT_DESCRIPTION: <commit description here>${historyContext}
 		`,
 		context: [diff],
 		examples: [
 			`
-				COMMIT_MESSAGE: Add a new feature
-				COMMIT_DESCRIPTION: This commit adds a new feature to the project.
+				COMMIT_MESSAGE: Implement async request batching for API calls
+				COMMIT_DESCRIPTION: Reduces server load by combining multiple API requests into batched operations. This architectural change improves performance by 40% during peak usage and prevents rate limiting issues encountered in production.
 			`,
 			`
-				COMMIT_MESSAGE: Fix a bug
-				COMMIT_DESCRIPTION: This commit fixes a bug in the project.
+				COMMIT_MESSAGE: Fix memory leak in event listener cleanup
+				COMMIT_DESCRIPTION: Event listeners were not being properly removed on component unmount, causing memory consumption to grow over time. Implemented proper cleanup in lifecycle methods to ensure all listeners are detached when components are destroyed.
 			`
 		]
 	});
@@ -134,10 +151,13 @@ async function commitCommand(cmd) {
 		let finalCommitMessage = '';
 		let finalCommitDescription = '';
 		let attemptCount = 0;
+		const history = [];
+		
 		while (!userSatisfied && attemptCount < 10) {
 			const { commitMessage, commitDescription } = await generateCommit(
 				diff,
-				ticket
+				ticket,
+				history
 			);
 			if (!commitMessage) return;
 			logger(`\n\n[green]Message: [white] ${commitMessage}`);
@@ -152,19 +172,25 @@ async function commitCommand(cmd) {
 
 			const answers = await inquirer.prompt([
 				{
-					type: 'confirm',
-					name: 'confirm',
-					// message: `Do you accept this commit message and description?\n\nMessage: ${commitMessage}\nDescription: ${commitDescription}`,
-					message: `Do you accept this commit message and description?`,
-					default: true
+					type: 'input',
+					name: 'feedback',
+					message: 'Accept? (Press Enter to accept, or provide feedback for improvement):',
+					default: ''
 				}
 			]);
 
-			if (answers.confirm) {
+			if (answers.feedback === '') {
+				// User pressed Enter without feedback - accept the commit
 				finalCommitMessage = commitMessage;
 				finalCommitDescription = commitDescription;
 				userSatisfied = true;
 			} else {
+				// User provided feedback - add to history and regenerate
+				history.push({
+					message: commitMessage,
+					description: commitDescription,
+					feedback: answers.feedback
+				});
 				attemptCount++;
 			}
 		}
