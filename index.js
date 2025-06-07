@@ -6,6 +6,7 @@ const simpleGit = require('simple-git');
 const logger = require('./log');
 const inquirer = require('inquirer').default;
 const { query } = require('llm-querier');
+const { gatherSmartContext, extractChangedFiles } = require('./contextGatherer');
 
 // Load API key from environment variables or a config file
 const { loadCredentials, saveCredentials } = require('@edjl/config');
@@ -30,7 +31,7 @@ function extractTicketFromBranch(branchName) {
 	return match ? match[1] : defaultTicketFor;
 }
 
-async function generateCommit(diff, ticket, history = []) {
+async function generateCommit(diff, ticket, history = [], smartMode = false) {
 	const provider = credentials.provider;
 	const model = credentials.model;
 	const apiKey = credentials.apiKey;
@@ -61,6 +62,20 @@ async function generateCommit(diff, ticket, history = []) {
 		});
 	}
 
+	// Prepare context array
+	const contextArray = [diff];
+	
+	// Add smart context if enabled
+	if (smartMode) {
+		logger('[cyan]🧠 Gathering smart context...');
+		const changedFiles = extractChangedFiles(diff);
+		const smartContext = await gatherSmartContext(diff, changedFiles);
+		
+		if (smartContext) {
+			contextArray.push(smartContext);
+		}
+	}
+
 	const result = await query({
 		model,
 		provider,
@@ -70,7 +85,7 @@ async function generateCommit(diff, ticket, history = []) {
 			Generate a commit message and a commit description for code changes
 
 			# How to
-			Use the provided context to generate the commit message and description. In the context section you will find the diff of the changes.
+			Use the provided context to generate the commit message and description. In the context section you will find the diff of the changes${smartMode ? ' and additional smart context about the affected components and their relationships' : ''}.
 
 			# CRITICAL Requirements
 			- DO NOT use conventional commit prefixes like "feat:", "fix:", "chore:", "docs:", "style:", "refactor:", "test:", "build:", etc.
@@ -81,13 +96,14 @@ async function generateCommit(diff, ticket, history = []) {
 			- AVOID stating obvious file changes like "updated package.json" or "modified index.js"
 			- Focus on the business logic, architectural decisions, or problem being solved
 			- Think about what a developer reading this commit in 6 months would need to know
+			${smartMode ? '- Use the smart context provided to understand component relationships and architecture' : ''}
 
 			# Format
 			The output format should consist of two lines, prefixed with "COMMIT_MESSAGE" for the commit message and "COMMIT_DESCRIPTION" for the commit description, like this:
 			COMMIT_MESSAGE: <commit message here>
 			COMMIT_DESCRIPTION: <commit description here>${historyContext}
 		`,
-		context: [diff],
+		context: contextArray,
 		examples: [
 			`
 				COMMIT_MESSAGE: Implement async request batching for API calls
@@ -157,7 +173,8 @@ async function commitCommand(cmd) {
 			const { commitMessage, commitDescription } = await generateCommit(
 				diff,
 				ticket,
-				history
+				history,
+				cmd.smart
 			);
 			if (!commitMessage) return;
 			logger(`\n\n[green]Message: [white] ${commitMessage}`);
@@ -225,13 +242,23 @@ async function addAliasToGitConfig() {
 			if (error) return reject(error);
 			exec('git config --global alias.ca "!gitp commit --add $*"', (error) => {
 				if (error) return reject(error);
-				resolve();
+				exec('git config --global alias.cs "!gitp commit --smart $*"', (error) => {
+					if (error) return reject(error);
+					exec('git config --global alias.cas "!gitp commit --add --smart $*"', (error) => {
+						if (error) return reject(error);
+						resolve();
+					});
+				});
 			});
 		});
 	}).finally(() => {
 		logger('[green]✅ Aliases added to git config.');
 		logger(
-			'[yellow]You can now use [green]git c[yellow] and [green]git ca[yellow] to commit and commit with add respectively.'
+			'[yellow]You can now use:\n' +
+			'[green]git c[yellow] - commit\n' +
+			'[green]git ca[yellow] - commit with add\n' +
+			'[green]git cs[yellow] - commit with smart context\n' +
+			'[green]git cas[yellow] - commit with add and smart context'
 		);
 	});
 }
@@ -269,6 +296,7 @@ async function main() {
 		.option('--no-verify', 'Skip git commit hooks', false)
 		.option('--add', 'Automatically add changes to the staging area', false)
 		.option('-y', 'Skip user confirmation', false)
+		.option('--smart', 'Enable smart context analysis for better commit messages', false)
 		.action(commitCommand);
 
 	program
