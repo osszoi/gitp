@@ -18,7 +18,7 @@ const git = simpleGit();
 // Extract Jira/GitHub/GitLab ticket from the branch name
 function extractTicketFromBranch(branchName) {
 	const match = branchName.match(
-		/(?:feature|bugfix|hotfix|release)\/([A-Za-z]+-\d+)/
+		/(?:feature|bugfix|hotfix|release)\/([A-Za-z0-9]+-\d+)/
 	);
 
 	// Current path
@@ -64,13 +64,13 @@ async function generateCommit(diff, ticket, history = [], smartMode = false) {
 
 	// Prepare context array
 	const contextArray = [diff];
-	
+
 	// Add smart context if enabled
 	if (smartMode) {
 		logger('[cyan]🧠 Gathering smart context...');
 		const changedFiles = extractChangedFiles(diff);
 		const smartContext = await gatherSmartContext(diff, changedFiles);
-		
+
 		if (smartContext) {
 			contextArray.push(smartContext);
 		}
@@ -85,7 +85,11 @@ async function generateCommit(diff, ticket, history = [], smartMode = false) {
 			Generate a commit message and a commit description for code changes
 
 			# How to
-			Use the provided context to generate the commit message and description. In the context section you will find the diff of the changes${smartMode ? ' and additional smart context about the affected components and their relationships' : ''}.
+			Use the provided context to generate the commit message and description. In the context section you will find the diff of the changes${
+				smartMode
+					? ' and additional smart context about the affected components and their relationships'
+					: ''
+			}.
 
 			# CRITICAL Requirements
 			- DO NOT use conventional commit prefixes like "feat:", "fix:", "chore:", "docs:", "style:", "refactor:", "test:", "build:", etc.
@@ -96,7 +100,11 @@ async function generateCommit(diff, ticket, history = [], smartMode = false) {
 			- AVOID stating obvious file changes like "updated package.json" or "modified index.js"
 			- Focus on the business logic, architectural decisions, or problem being solved
 			- Think about what a developer reading this commit in 6 months would need to know
-			${smartMode ? '- Use the smart context provided to understand component relationships and architecture' : ''}
+			${
+				smartMode
+					? '- Use the smart context provided to understand component relationships and architecture'
+					: ''
+			}
 
 			# Format
 			The output format should consist of two lines, prefixed with "COMMIT_MESSAGE" for the commit message and "COMMIT_DESCRIPTION" for the commit description, like this:
@@ -168,7 +176,7 @@ async function commitCommand(cmd) {
 		let finalCommitDescription = '';
 		let attemptCount = 0;
 		const history = [];
-		
+
 		while (!userSatisfied && attemptCount < 10) {
 			const { commitMessage, commitDescription } = await generateCommit(
 				diff,
