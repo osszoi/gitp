@@ -7,6 +7,7 @@ This project helps automate the process of generating Git commit messages using 
 - **OpenAI Integration**: Generate commit messages and descriptions using the OpenAI API.
 - **Dry-run Mode**: Simulate the OpenAI request without performing git operations (commit, push, or add).
 - **Default Ticket prefix for commits**: Set prefix commits with Jira/Github/Gitlab ticket
+- **Conventional Commits Support**: Use conventional commit format for specific repositories with semantic-release compatibility
 
 ## Installation
 
@@ -47,6 +48,24 @@ This will add:
 
 ```sh
 gitp set-default-ticket-for <path> <ticket>
+```
+
+### Configure conventional commits for specific paths
+
+```sh
+gitp set-conventional-commits-for <path>
+```
+
+This will enable conventional commit format (feat:, fix:, etc.) for repositories matching the specified path. The path can be a regex pattern or simple string matching.
+
+To remove a path from conventional commits:
+```sh
+gitp remove-conventional-commits-for <path>
+```
+
+To list all configured paths:
+```sh
+gitp list-conventional-commits
 ```
 
 ## Usage
@@ -127,6 +146,21 @@ gitp set-model gpt-4
 gitp set-provider deepseek
 gitp set-model deepseek-coder
 ```
+
+### Example 6: Configure conventional commits
+
+```sh
+gitp set-conventional-commits-for my-project
+```
+
+This will generate commits like:
+- `feat: add new authentication feature`
+- `fix: resolve login issue`
+- `chore: update dependencies`
+
+When combined with default tickets:
+- `feat: PROJECT-123 add new authentication feature`
+- `fix: PROJECT-123 resolve login issue`
 
 ## License
 

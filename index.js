@@ -31,6 +31,22 @@ function extractTicketFromBranch(branchName) {
 	return match ? match[1] : defaultTicketFor;
 }
 
+// Check if conventional commits should be used for current path
+function shouldUseConventionalCommits() {
+	const currentPath = process.cwd();
+	const useConventionalCommitsIn = credentials.useConventionalCommitsIn || [];
+
+	return useConventionalCommitsIn.some((item) => {
+		try {
+			const regex = new RegExp(item.path);
+			return regex.test(currentPath);
+		} catch (error) {
+			// If regex is invalid, fall back to simple string matching
+			return currentPath.includes(item.path);
+		}
+	});
+}
+
 async function generateCommit(diff, ticket, history = [], smartMode = false) {
 	const provider = credentials.provider;
 	const model = credentials.model;
@@ -76,6 +92,9 @@ async function generateCommit(diff, ticket, history = [], smartMode = false) {
 		}
 	}
 
+	// Check if conventional commits should be used
+	const useConventionalCommits = shouldUseConventionalCommits();
+
 	const result = await query({
 		model,
 		provider,
@@ -92,7 +111,21 @@ async function generateCommit(diff, ticket, history = [], smartMode = false) {
 			}.
 
 			# CRITICAL Requirements
-			- DO NOT use conventional commit prefixes like "feat:", "fix:", "chore:", "docs:", "style:", "refactor:", "test:", "build:", etc.
+			${
+				useConventionalCommits
+					? `- MUST use conventional commit format following the npm library @semantic-release standard
+			- You must decide which conventional commit type best applies to the changes
+			- The commit message should be very short and straight to the point
+			- The commit description should provide meaningful technical context about WHY the changes were made, not just WHAT was changed
+			- AVOID stating obvious file changes like "updated package.json" or "modified index.js"
+			- Focus on the business logic, architectural decisions, or problem being solved
+			- Think about what a developer reading this commit in 6 months would need to know
+			${
+				smartMode
+					? '- Use the smart context provided to understand component relationships and architecture'
+					: ''
+			}`
+					: `- DO NOT use conventional commit prefixes like "feat:", "fix:", "chore:", "docs:", "style:", "refactor:", "test:", "build:", etc.
 			- Start the commit message directly with the action verb (e.g., "Add", "Update", "Fix", "Implement", "Refactor")
 			- Write as a SENIOR DEVELOPER would - professional, concise, and technically accurate
 			- The commit message should be very short and straight to the point (max 50 characters)
@@ -104,6 +137,7 @@ async function generateCommit(diff, ticket, history = [], smartMode = false) {
 				smartMode
 					? '- Use the smart context provided to understand component relationships and architecture'
 					: ''
+			}`
 			}
 
 			# Format
@@ -112,7 +146,16 @@ async function generateCommit(diff, ticket, history = [], smartMode = false) {
 			COMMIT_DESCRIPTION: <commit description here>${historyContext}
 		`,
 		context: contextArray,
-		examples: [
+		examples: useConventionalCommits ? [
+			`
+				COMMIT_MESSAGE: feat: implement async request batching for API calls
+				COMMIT_DESCRIPTION: Reduces server load by combining multiple API requests into batched operations. This architectural change improves performance by 40% during peak usage and prevents rate limiting issues encountered in production.
+			`,
+			`
+				COMMIT_MESSAGE: fix: resolve memory leak in event listener cleanup
+				COMMIT_DESCRIPTION: Event listeners were not being properly removed on component unmount, causing memory consumption to grow over time. Implemented proper cleanup in lifecycle methods to ensure all listeners are detached when components are destroyed.
+			`
+		] : [
 			`
 				COMMIT_MESSAGE: Implement async request batching for API calls
 				COMMIT_DESCRIPTION: Reduces server load by combining multiple API requests into batched operations. This architectural change improves performance by 40% during peak usage and prevents rate limiting issues encountered in production.
@@ -130,9 +173,22 @@ async function generateCommit(diff, ticket, history = [], smartMode = false) {
 	commitDescription = '';
 	commit.forEach((line) => {
 		if (line.startsWith('COMMIT_MESSAGE:')) {
-			commitMessage = `${ticket?.length ? `${ticket}: ` : ''}${line
-				.replace('COMMIT_MESSAGE:', '')
-				.trim()}`;
+			const message = line.replace('COMMIT_MESSAGE:', '').trim();
+
+			// Handle conventional commits with tickets
+			if (useConventionalCommits && ticket?.length) {
+				// For conventional commits, add ticket after the type/scope part
+				// Example: feat: EXAMPLE-0000 add new feature
+				const match = message.match(/^(\w+(?:\([^)]+\))?:)\s*(.+)$/);
+				if (match) {
+					commitMessage = `${match[1]} ${ticket} ${match[2]}`;
+				} else {
+					// Fallback if regex doesn't match
+					commitMessage = `${ticket}: ${message}`;
+				}
+			} else {
+				commitMessage = `${ticket?.length ? `${ticket}: ` : ''}${message}`;
+			}
 		} else if (line.startsWith('COMMIT_DESCRIPTION:')) {
 			commitDescription = line.replace('COMMIT_DESCRIPTION:', '').trim();
 		}
@@ -343,6 +399,63 @@ async function main() {
 			saveCredentials('gitp', {
 				...credentials,
 				defaultTicketFor: final
+			});
+		});
+
+	program
+		.command('set-conventional-commits-for <path>')
+		.description('Add a path to use conventional commits format')
+		.action((path) => {
+			const current = credentials.useConventionalCommitsIn || [];
+			let final = [];
+
+			if (current.find((item) => item.path === path)) {
+				logger('[yellow]Path already configured for conventional commits.');
+				return;
+			} else {
+				final = [...current, { path }];
+			}
+
+			saveCredentials('gitp', {
+				...credentials,
+				useConventionalCommitsIn: final
+			});
+			logger('[green]✅ Path added to conventional commits configuration.');
+		});
+
+	program
+		.command('remove-conventional-commits-for <path>')
+		.description('Remove a path from conventional commits format')
+		.action((path) => {
+			const current = credentials.useConventionalCommitsIn || [];
+			const final = current.filter((item) => item.path !== path);
+
+			if (final.length === current.length) {
+				logger('[yellow]Path not found in conventional commits configuration.');
+				return;
+			}
+
+			saveCredentials('gitp', {
+				...credentials,
+				useConventionalCommitsIn: final
+			});
+			logger('[green]✅ Path removed from conventional commits configuration.');
+		});
+
+	program
+		.command('list-conventional-commits')
+		.description('List all paths configured for conventional commits')
+		.action(() => {
+			const current = credentials.useConventionalCommitsIn || [];
+
+			if (current.length === 0) {
+				logger('[yellow]No paths configured for conventional commits.');
+				return;
+			}
+
+			logger('[green]Paths configured for conventional commits:');
+			current.forEach((item) => {
+				logger(`[white]  - ${item.path}`);
 			});
 		});
 
