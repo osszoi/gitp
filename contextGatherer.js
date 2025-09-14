@@ -1,6 +1,7 @@
 const fs = require('fs').promises;
 const path = require('path');
 const logger = require('./log');
+const ora = require('ora');
 
 const MAX_CONTEXT_SIZE = 50000; // ~50k tokens worth of context
 
@@ -75,23 +76,26 @@ function extractHooks(content) {
 }
 
 // Find files that import a specific file
-async function findWhoImports(targetFile, searchDir = '.') {
+async function findWhoImports(targetFile, searchDir = '.', spinner = null) {
 	const importers = [];
 	const targetBaseName = path.basename(targetFile, path.extname(targetFile));
-	
+
 	async function searchDirectory(dir) {
 		try {
 			const entries = await fs.readdir(dir, { withFileTypes: true });
-			
+
 			for (const entry of entries) {
 				const fullPath = path.join(dir, entry.name);
-				
+
 				// Skip node_modules and other common directories
 				if (entry.isDirectory()) {
 					if (!['node_modules', '.git', 'dist', 'build', 'coverage'].includes(entry.name)) {
 						await searchDirectory(fullPath);
 					}
 				} else if (entry.isFile() && /\.(ts|tsx|js|jsx)$/.test(entry.name)) {
+					if (spinner) {
+						spinner.text = `🔍 Scanning ${path.basename(fullPath)} for imports...`;
+					}
 					const content = await safeReadFile(fullPath);
 					if (content && content.includes(targetBaseName)) {
 						// More precise check for imports
@@ -106,7 +110,7 @@ async function findWhoImports(targetFile, searchDir = '.') {
 			// Silently handle permission errors
 		}
 	}
-	
+
 	await searchDirectory(searchDir);
 	return importers.slice(0, 5); // Return top 5 importers
 }
@@ -162,91 +166,99 @@ async function gatherJavaContext(file, content) {
 // Main context gathering function
 async function gatherSmartContext(diff, changedFiles) {
 	const contexts = [];
-	
+	const spinner = ora('🧠 Analyzing codebase structure...').start();
+
 	try {
 		for (const file of changedFiles) {
 			// Process TypeScript/JavaScript files
 			if (/\.(ts|tsx|js|jsx)$/.test(file)) {
+				spinner.text = `📄 Analyzing ${path.basename(file)}...`;
 				const content = await safeReadFile(file);
 				if (!content) continue;
-			
-			const fileContext = {
-				file,
-				componentName: extractComponentName(content, file),
-				imports: extractImports(content).filter(imp => imp.startsWith('.')),
-				hooks: extractHooks(content),
-				props: extractPropsType(content),
-				stateManagement: detectStateManagement(content)
-			};
-			
-			// Find who imports this component
-			if (fileContext.componentName) {
-				fileContext.importedBy = await findWhoImports(file);
+
+				const fileContext = {
+					file,
+					componentName: extractComponentName(content, file),
+					imports: extractImports(content).filter(imp => imp.startsWith('.')),
+					hooks: extractHooks(content),
+					props: extractPropsType(content),
+					stateManagement: detectStateManagement(content)
+				};
+
+				// Find who imports this component
+				if (fileContext.componentName) {
+					spinner.text = `🔗 Finding dependencies for ${fileContext.componentName}...`;
+					fileContext.importedBy = await findWhoImports(file, '.', spinner);
+				}
+
+				// Create a concise context summary
+				const contextSummary = [];
+
+				if (fileContext.componentName) {
+					contextSummary.push(`Component: ${fileContext.componentName}`);
+				}
+
+				if (fileContext.importedBy && fileContext.importedBy.length > 0) {
+					contextSummary.push(`Used by: ${fileContext.importedBy.map(f => path.basename(f)).join(', ')}`);
+				}
+
+				if (fileContext.hooks.length > 0) {
+					contextSummary.push(`Hooks: ${fileContext.hooks.join(', ')}`);
+				}
+
+				if (fileContext.props) {
+					contextSummary.push(`Props interface: ${fileContext.props.name}`);
+				}
+
+				if (fileContext.stateManagement.length > 0) {
+					contextSummary.push(`State management: ${fileContext.stateManagement.join(', ')}`);
+				}
+
+				if (contextSummary.length > 0) {
+					contexts.push(`\n### Context for ${path.basename(file)}:\n${contextSummary.join('\n')}`);
+				}
 			}
-			
-			// Create a concise context summary
-			const contextSummary = [];
-			
-			if (fileContext.componentName) {
-				contextSummary.push(`Component: ${fileContext.componentName}`);
-			}
-			
-			if (fileContext.importedBy && fileContext.importedBy.length > 0) {
-				contextSummary.push(`Used by: ${fileContext.importedBy.map(f => path.basename(f)).join(', ')}`);
-			}
-			
-			if (fileContext.hooks.length > 0) {
-				contextSummary.push(`Hooks: ${fileContext.hooks.join(', ')}`);
-			}
-			
-			if (fileContext.props) {
-				contextSummary.push(`Props interface: ${fileContext.props.name}`);
-			}
-			
-			if (fileContext.stateManagement.length > 0) {
-				contextSummary.push(`State management: ${fileContext.stateManagement.join(', ')}`);
-			}
-			
-			if (contextSummary.length > 0) {
-				contexts.push(`\n### Context for ${path.basename(file)}:\n${contextSummary.join('\n')}`);
+
+			// Process Java files
+			if (/\.java$/.test(file)) {
+				spinner.text = `☕ Analyzing Java file ${path.basename(file)}...`;
+				const content = await safeReadFile(file);
+				if (!content) continue;
+
+				const javaContext = await gatherJavaContext(file, content);
+				if (javaContext.length > 0) {
+					contexts.push(`\n### Context for ${path.basename(file)}:\n${javaContext.join('\n')}`);
+				}
 			}
 		}
-		
-		// Process Java files
-		if (/\.java$/.test(file)) {
-			const content = await safeReadFile(file);
-			if (!content) continue;
-			
-			const javaContext = await gatherJavaContext(file, content);
-			if (javaContext.length > 0) {
-				contexts.push(`\n### Context for ${path.basename(file)}:\n${javaContext.join('\n')}`);
-			}
-		}
-		}
-		
+
 		// For CSS/SCSS changes, try to find the component
 		const styleFiles = changedFiles.filter(f => /\.(css|scss|sass|less)$/.test(f));
 		for (const styleFile of styleFiles) {
+			spinner.text = `🎨 Analyzing styles in ${path.basename(styleFile)}...`;
 			const baseName = path.basename(styleFile, path.extname(styleFile));
-			const possibleComponent = changedFiles.find(f => 
+			const possibleComponent = changedFiles.find(f =>
 				f.includes(baseName) && /\.(tsx?|jsx?)$/.test(f)
 			);
-			
+
 			if (possibleComponent) {
 				contexts.push(`\n### Style context:\n${path.basename(styleFile)} belongs to ${path.basename(possibleComponent)}`);
 			}
 		}
-		
+
+		spinner.succeed('✨ Smart context analysis complete!');
+
 	} catch (error) {
+		spinner.fail(`❌ Error gathering smart context: ${error.message}`);
 		logger(`[yellow]Warning: Error gathering smart context: ${error.message}`);
 	}
-	
+
 	// Trim context if it's too large
 	let contextString = contexts.join('\n');
 	if (contextString.length > MAX_CONTEXT_SIZE) {
 		contextString = contextString.substring(0, MAX_CONTEXT_SIZE) + '\n... (context trimmed)';
 	}
-	
+
 	return contextString;
 }
 

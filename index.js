@@ -7,11 +7,50 @@ const logger = require('./log');
 const inquirer = require('inquirer').default;
 const { query } = require('llm-querier');
 const { gatherSmartContext, extractChangedFiles, filterLockFilesFromDiff } = require('./contextGatherer');
+const ora = require('ora');
 
 // Load API key from environment variables or a config file
 const { loadCredentials, saveCredentials } = require('@edjl/config');
 
 const credentials = loadCredentials('gitp');
+
+// Cool waiting messages for LLM responses
+const WAITING_MESSAGES = [
+	"🤖 AI is crafting the perfect commit message...",
+	"🧠 Neural networks are analyzing your genius code...",
+	"✨ Magic is happening in the cloud...",
+	"🚀 Loading AI superpowers...",
+	"🎯 Targeting the most descriptive words...",
+	"🔮 Consulting the commit message oracle...",
+	"⚡ Charging up the creativity circuits...",
+	"🎨 Painting your changes with words...",
+	"🧙‍♂️ Casting commit message spells...",
+	"🔥 Igniting the AI engines...",
+	"💎 Polishing your commit to perfection...",
+	"🌟 Stardust is settling into words...",
+	"🎪 The AI circus is performing for you...",
+	"🦄 Unicorns are writing your commit...",
+	"🎵 Composing a symphony of code changes...",
+	"🍕 AI is ordering pizza... wait, analyzing code...",
+	"🎲 Rolling the dice of perfect descriptions...",
+	"🏆 Competing for the best commit award...",
+	"🌈 Painting rainbows with your diffs...",
+	"🎭 Performing commit message theater...",
+	"🔬 Running scientific commit experiments...",
+	"🎪 Ladies and gentlemen, the amazing AI...",
+	"🌙 Nighttime coding deserves stellar commits...",
+	"☕ AI needs coffee too... processing...",
+	"🎨 Bob Ross would be proud of this commit...",
+	"🎯 Bullseye! Aiming for commit perfection...",
+	"🚁 Helicopter view of your code changes...",
+	"🎪 Step right up to the commit carnival...",
+	"🔍 CSI: Code Scene Investigation...",
+	"🎵 Your code changes are music to my circuits..."
+];
+
+function getRandomWaitingMessage() {
+	return WAITING_MESSAGES[Math.floor(Math.random() * WAITING_MESSAGES.length)];
+}
 
 const git = simpleGit();
 
@@ -76,7 +115,6 @@ async function generateCommit(diff, branchName, history = [], smartMode = false)
 
 	// Add smart context if enabled
 	if (smartMode) {
-		logger('[cyan]🧠 Gathering smart context...');
 		const changedFiles = extractChangedFiles(diff);
 		const smartContext = await gatherSmartContext(diff, changedFiles);
 
@@ -87,6 +125,9 @@ async function generateCommit(diff, branchName, history = [], smartMode = false)
 
 	// Check if conventional commits should be used
 	const useConventionalCommits = shouldUseConventionalCommits();
+
+	// Start the LLM spinner with a random message
+	const llmSpinner = ora(getRandomWaitingMessage()).start();
 
 	const result = await query({
 		model,
@@ -182,6 +223,8 @@ async function generateCommit(diff, branchName, history = [], smartMode = false)
 			`
 		]
 	});
+
+	llmSpinner.succeed('🎉 Perfect commit message generated!');
 
 	const commit = result.split('\n').map((line) => line.trim());
 

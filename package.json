@@ -21,6 +21,7 @@
     "inquirer": "^12.4.2",
     "llm-querier": "^1.0.1",
     "openai": "^4.77.3",
+    "ora": "^5.4.1",
     "simple-git": "^3.27.0"
   }
 }
