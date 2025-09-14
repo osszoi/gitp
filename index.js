@@ -64,18 +64,18 @@ async function interactiveFileSelection() {
 		const choices = [];
 
 		// Add staged files (pre-checked)
-		status.staged.forEach(file => {
+		status.staged.forEach((file) => {
 			choices.push({
-				name: `✅ ${file} (already staged)`,
+				name: `${file}`,
 				value: file,
 				checked: true
 			});
 		});
 
 		// Add unstaged files (not checked)
-		status.not_added.forEach(file => {
+		status.not_added.forEach((file) => {
 			choices.push({
-				name: `📄 ${file} (not staged)`,
+				name: `${file}`,
 				value: file,
 				checked: false
 			});
@@ -85,7 +85,7 @@ async function interactiveFileSelection() {
 			// Only add if not already in staged
 			if (!status.staged.includes(file)) {
 				choices.push({
-					name: `📝 ${file} (modified)`,
+					name: `${file}`,
 					value: file,
 					checked: false
 				});
