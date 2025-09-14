@@ -52,6 +52,119 @@ function getRandomWaitingMessage() {
 	return WAITING_MESSAGES[Math.floor(Math.random() * WAITING_MESSAGES.length)];
 }
 
+// Interactive file selection function
+async function interactiveFileSelection() {
+	const spinner = ora('📂 Getting file status...').start();
+
+	try {
+		const status = await git.status();
+		spinner.succeed('📋 Files ready for selection!');
+
+		// Prepare choices with status indicators
+		const choices = [];
+
+		// Add staged files (pre-checked)
+		status.staged.forEach(file => {
+			choices.push({
+				name: `✅ ${file} (already staged)`,
+				value: file,
+				checked: true
+			});
+		});
+
+		// Add unstaged files (not checked)
+		status.not_added.forEach(file => {
+			choices.push({
+				name: `📄 ${file} (not staged)`,
+				value: file,
+				checked: false
+			});
+		});
+
+		status.modified.forEach(file => {
+			// Only add if not already in staged
+			if (!status.staged.includes(file)) {
+				choices.push({
+					name: `📝 ${file} (modified)`,
+					value: file,
+					checked: false
+				});
+			}
+		});
+
+		if (choices.length === 0) {
+			logger('[yellow]⚠️ No files available for selection.');
+			return { selectedFiles: [], shouldContinue: false };
+		}
+
+		// Show interactive checkbox prompt
+		const answers = await inquirer.prompt([
+			{
+				type: 'checkbox',
+				name: 'selectedFiles',
+				message: '📁 Select files to stage (use ↑↓ to navigate, space to select, enter to confirm):',
+				choices: choices,
+				pageSize: 15,
+				loop: false
+			}
+		]);
+
+		return {
+			selectedFiles: answers.selectedFiles,
+			currentlyStaged: status.staged,
+			shouldContinue: true
+		};
+
+	} catch (error) {
+		spinner.fail('❌ Failed to get file status');
+		throw error;
+	}
+}
+
+// Handle file staging based on interactive selection
+async function handleFileStaging(selectedFiles, currentlyStaged) {
+	const spinner = ora('📁 Updating file staging...').start();
+
+	try {
+		// Files to unstage (were staged but not selected)
+		const filesToUnstage = currentlyStaged.filter(file => !selectedFiles.includes(file));
+
+		// Files to stage (selected but not currently staged)
+		const filesToStage = selectedFiles.filter(file => !currentlyStaged.includes(file));
+
+		// Unstage files that were deselected
+		for (const file of filesToUnstage) {
+			await git.reset(['HEAD', file]);
+			spinner.text = `📤 Unstaged ${file}`;
+		}
+
+		// Stage selected files
+		for (const file of filesToStage) {
+			await git.add(file);
+			spinner.text = `📥 Staged ${file}`;
+		}
+
+		const stagedCount = selectedFiles.length;
+		const unstagedCount = filesToUnstage.length;
+
+		let message = '✨ File staging complete!';
+		if (stagedCount > 0 && unstagedCount > 0) {
+			message = `✨ Staged ${stagedCount} files, unstaged ${unstagedCount} files!`;
+		} else if (stagedCount > 0) {
+			message = `✨ Staged ${stagedCount} files!`;
+		} else if (unstagedCount > 0) {
+			message = `✨ Unstaged ${unstagedCount} files!`;
+		}
+
+		spinner.succeed(message);
+		return true;
+
+	} catch (error) {
+		spinner.fail('❌ Failed to update file staging');
+		throw error;
+	}
+}
+
 const git = simpleGit();
 
 
@@ -276,8 +389,27 @@ async function commitCommand(cmd) {
 		}
 
 		if (cmd.add) {
-			await git.add('.');
-			addExecuted = true;
+			if (cmd.interactive) {
+				// Interactive file selection mode
+				const selection = await interactiveFileSelection();
+
+				if (!selection.shouldContinue) {
+					logger('[yellow]⚠️ No files selected for staging.');
+					return;
+				}
+
+				if (selection.selectedFiles.length === 0) {
+					logger('[yellow]⚠️ No files selected for staging.');
+					return;
+				}
+
+				await handleFileStaging(selection.selectedFiles, selection.currentlyStaged);
+				addExecuted = true;
+			} else {
+				// Traditional add all mode
+				await git.add('.');
+				addExecuted = true;
+			}
 		}
 
 		const diff = await git.diff(['--cached']); // ['--cached']
@@ -396,7 +528,13 @@ async function addAliasToGitConfig() {
 					if (error) return reject(error);
 					exec('git config --global alias.cas "!gitp commit --add --smart $*"', (error) => {
 						if (error) return reject(error);
-						resolve();
+						exec('git config --global alias.cai "!gitp commit --add --interactive $*"', (error) => {
+							if (error) return reject(error);
+							exec('git config --global alias.casi "!gitp commit --add --smart --interactive $*"', (error) => {
+								if (error) return reject(error);
+								resolve();
+							});
+						});
 					});
 				});
 			});
@@ -408,7 +546,9 @@ async function addAliasToGitConfig() {
 			'[green]git c[yellow] - commit\n' +
 			'[green]git ca[yellow] - commit with add\n' +
 			'[green]git cs[yellow] - commit with smart context\n' +
-			'[green]git cas[yellow] - commit with add and smart context'
+			'[green]git cas[yellow] - commit with add and smart context\n' +
+			'[green]git cai[yellow] - commit with add and interactive selection\n' +
+			'[green]git casi[yellow] - commit with add, smart context, and interactive selection'
 		);
 	});
 }
@@ -445,6 +585,7 @@ async function main() {
 		.option('--dry-run', 'Perform OpenAI request without git operations', false)
 		.option('--no-verify', 'Skip git commit hooks', false)
 		.option('--add', 'Automatically add changes to the staging area', false)
+		.option('--interactive', 'Interactive file selection (use with --add)', false)
 		.option('-y', 'Skip user confirmation', false)
 		.option('--smart', 'Enable smart context analysis for better commit messages', false)
 		.action(commitCommand);
