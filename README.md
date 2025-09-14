@@ -1,8 +1,8 @@
 <div align="center">
 
-![Gitp Logo](resources/gitp.png)
+<img src="resources/gitp.png" alt="Gitp Logo" width="150">
 
-`npm install -g gitp`
+<p><code>npm install -g gitp</code></p>
 
 </div>
 
@@ -30,12 +30,12 @@ Stop wasting time writing commit messages and let AI do the heavy lifting. Gitp 
 
 ## ✨ Features
 
-🤖 **Multi-AI Provider Support** - Works with OpenAI, Google, and DeepSeek
-🎯 **Smart Context Analysis** - Understands your code changes for better messages
-🎫 **Automatic Ticket Integration** - Links commits to Jira/GitHub/GitLab tickets
-📝 **Conventional Commits** - Perfect for semantic-release workflows
-🔍 **Dry-run Mode** - Preview before committing
-⚡ **Git Aliases** - Lightning-fast shortcuts
+- 🤖 **Multi-AI Provider Support** - Works with OpenAI and Google
+- 🎯 **Smart Context Analysis** - Understands your code changes for better messages
+- 🎫 **Automatic Ticket Integration** - Links commits to Jira/GitHub/GitLab tickets
+- 📝 **Conventional Commits** - Perfect for semantic-release workflows
+- 🔍 **Dry-run Mode** - Preview before committing
+- ⚡ **Git Aliases** - Lightning-fast shortcuts
 
 ## 📦 Installation
 
@@ -52,15 +52,13 @@ npm install -g gitp
 # Choose your AI provider
 gitp set-provider openai     # 🤖 OpenAI GPT models
 gitp set-provider google     # 🧠 Google Gemini
-gitp set-provider deepseek   # 🔥 DeepSeek Coder
 
 # Add your API key
 gitp set-api-key <your-api-key>
 
 # Pick your model
-gitp set-model gpt-4         # For OpenAI
-gitp set-model gemini-pro    # For Google
-gitp set-model deepseek-coder # For DeepSeek
+gitp set-model gpt-5         # For OpenAI
+gitp set-model gemini-2.5-pro    # For Google
 ```
 
 ### ⚡ Git Aliases (Recommended!)
