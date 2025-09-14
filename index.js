@@ -196,6 +196,32 @@ async function generateCommit(diff, branchName, history = [], smartMode = false)
 }
 
 async function commitCommand(cmd) {
+	let addExecuted = false;
+	let commitCompleted = false;
+
+	// Cleanup function to revert git add if needed
+	const cleanup = async () => {
+		if (addExecuted && !commitCompleted) {
+			try {
+				logger('[yellow]⚠️ Reverting git add due to cancellation...');
+				await git.reset(['HEAD']);
+				logger('[green]✅ Git add reverted successfully.');
+			} catch (error) {
+				logger('[red]❌ Failed to revert git add:', error.message);
+			}
+		}
+	};
+
+	// Set up signal handlers
+	const signalHandler = async (signal) => {
+		logger(`\n[yellow]⚠️ Received ${signal}, cleaning up...`);
+		await cleanup();
+		process.exit(0);
+	};
+
+	process.on('SIGINT', signalHandler);
+	process.on('SIGTERM', signalHandler);
+
 	try {
 		const isGitRepo = await git.checkIsRepo();
 		if (!isGitRepo) {
@@ -205,6 +231,7 @@ async function commitCommand(cmd) {
 
 		if (cmd.add) {
 			await git.add('.');
+			addExecuted = true;
 		}
 
 		const diff = await git.diff(['--cached']); // ['--cached']
@@ -247,14 +274,25 @@ async function commitCommand(cmd) {
 				break;
 			}
 
-			const answers = await inquirer.prompt([
-				{
-					type: 'input',
-					name: 'feedback',
-					message: 'Accept? (Press Enter to accept, or provide feedback for improvement):',
-					default: ''
+			let answers;
+			try {
+				answers = await inquirer.prompt([
+					{
+						type: 'input',
+						name: 'feedback',
+						message: 'Accept? (Press Enter to accept, or provide feedback for improvement):',
+						default: ''
+					}
+				]);
+			} catch (error) {
+				// User cancelled with Ctrl+C
+				if (error.isTtyError === false || error.name === 'ExitPromptError') {
+					logger('\n[yellow]⚠️ Operation cancelled by user.');
+					await cleanup();
+					return;
 				}
-			]);
+				throw error;
+			}
 
 			if (answers.feedback === '') {
 				// User pressed Enter without feedback - accept the commit
@@ -289,8 +327,14 @@ async function commitCommand(cmd) {
 		}
 
 		await git.commit(commitArgs);
+		commitCompleted = true;
 	} catch (error) {
 		logger('❌ Error:', error.message);
+		await cleanup();
+	} finally {
+		// Clean up signal handlers
+		process.removeListener('SIGINT', signalHandler);
+		process.removeListener('SIGTERM', signalHandler);
 	}
 }
 
