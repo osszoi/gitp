@@ -250,24 +250,72 @@ async function gatherSmartContext(diff, changedFiles) {
 	return contextString;
 }
 
+// Lock file patterns to exclude from context
+const LOCK_FILE_PATTERNS = [
+	/package-lock\.json$/,
+	/yarn\.lock$/,
+	/pnpm-lock\.yaml$/,
+	/composer\.lock$/,
+	/Gemfile\.lock$/,
+	/Pipfile\.lock$/,
+	/poetry\.lock$/,
+	/cargo\.lock$/i,
+	/go\.sum$/,
+	/mix\.lock$/
+];
+
+// Check if a file is a lock file
+function isLockFile(filePath) {
+	return LOCK_FILE_PATTERNS.some(pattern => pattern.test(filePath));
+}
+
 // Extract changed files from git diff
 function extractChangedFiles(diff) {
 	const files = [];
 	const diffLines = diff.split('\n');
-	
+
 	for (const line of diffLines) {
 		if (line.startsWith('diff --git')) {
 			const match = line.match(/b\/(.+)$/);
 			if (match) {
-				files.push(match[1]);
+				const filePath = match[1];
+				// Exclude lock files from being processed
+				if (!isLockFile(filePath)) {
+					files.push(filePath);
+				}
 			}
 		}
 	}
-	
+
 	return files;
+}
+
+// Filter lock files from git diff content
+function filterLockFilesFromDiff(diff) {
+	const lines = diff.split('\n');
+	const filteredLines = [];
+	let skipCurrentFile = false;
+
+	for (const line of lines) {
+		if (line.startsWith('diff --git')) {
+			const match = line.match(/b\/(.+)$/);
+			if (match && isLockFile(match[1])) {
+				skipCurrentFile = true;
+				continue;
+			} else {
+				skipCurrentFile = false;
+				filteredLines.push(line);
+			}
+		} else if (!skipCurrentFile) {
+			filteredLines.push(line);
+		}
+	}
+
+	return filteredLines.join('\n');
 }
 
 module.exports = {
 	gatherSmartContext,
-	extractChangedFiles
+	extractChangedFiles,
+	filterLockFilesFromDiff
 };

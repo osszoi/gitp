@@ -6,7 +6,7 @@ const simpleGit = require('simple-git');
 const logger = require('./log');
 const inquirer = require('inquirer').default;
 const { query } = require('llm-querier');
-const { gatherSmartContext, extractChangedFiles } = require('./contextGatherer');
+const { gatherSmartContext, extractChangedFiles, filterLockFilesFromDiff } = require('./contextGatherer');
 
 // Load API key from environment variables or a config file
 const { loadCredentials, saveCredentials } = require('@edjl/config');
@@ -63,8 +63,11 @@ async function generateCommit(diff, branchName, history = [], smartMode = false)
 		});
 	}
 
+	// Filter out lock files from diff before sending to LLM
+	const filteredDiff = filterLockFilesFromDiff(diff);
+
 	// Prepare context array
-	const contextArray = [diff];
+	const contextArray = [filteredDiff];
 
 	// Add branch name to context
 	if (branchName) {
