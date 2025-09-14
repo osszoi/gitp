@@ -1,8 +1,32 @@
+<div align="center">
+
+![Gitp Logo](resources/gitp.png)
+
+`npm install -g gitp`
+
+</div>
+
+---
+
 # 🚀 Gitp - AI-Powered Git Commits
 
 > Transform your git workflow with intelligent commit messages powered by AI! ✨
 
 Stop wasting time writing commit messages and let AI do the heavy lifting. Gitp analyzes your changes and generates meaningful, contextual commit messages that actually make sense.
+
+## 📸 See It In Action
+
+### git ca - Add files + commit
+![git ca](resources/git_ca.png)
+
+### git cai - Interactive file staging
+![git cai](resources/git_cai.png)
+
+### git cas - Smart AI analysis (waiting)
+![git cas waiting](resources/git_cas_waiting.png)
+
+### git cas - Smart AI analysis (result)
+![git cas finished](resources/git_cas_finished.png)
 
 ## ✨ Features
 
@@ -128,27 +152,31 @@ You: *stares at terminal for 5 minutes thinking of commit message*
 
 **With Gitp:**
 ```sh
-git cas  # Add + Smart AI commit in one go!
+git ca  # Add files + smart commit
 ```
 
-**✨ Result:**
+![git ca example](resources/git_ca.png)
+
+### 🎯 Interactive File Staging
+
+Use `git cai` to selectively stage files with an interactive interface:
+
+![git cai example](resources/git_cai.png)
+
+### 🧠 Smart Context Analysis
+
+**With Smart AI Analysis:**
+```sh
+git cas  # Add + Smart AI commit with context analysis
 ```
-🤖 AI Analysis: Detected authentication system implementation
-📝 Generated commit:
 
-feat: implement OAuth2 authentication with JWT tokens
+**🔄 Processing (AI analyzing your changes):**
 
-Added secure user authentication system with:
-- OAuth2 integration for Google and GitHub
-- JWT token management with refresh logic
-- Protected route middleware
-- User session persistence
-- Comprehensive error handling
+![git cas waiting](resources/git_cas_waiting.png)
 
-Includes unit tests and API documentation.
+**✨ Final Result:**
 
-✅ Commit created successfully!
-```
+![git cas finished](resources/git_cas_finished.png)
 
 ### 🎯 Real-World Scenarios
 
