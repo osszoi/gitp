@@ -15,21 +15,6 @@ const credentials = loadCredentials('gitp');
 
 const git = simpleGit();
 
-// Extract Jira/GitHub/GitLab ticket from the branch name
-function extractTicketFromBranch(branchName) {
-	const match = branchName.match(
-		/(?:feature|bugfix|hotfix|release)\/([A-Za-z0-9]+-\d+)/
-	);
-
-	// Current path
-	const currentPath = process.cwd();
-	const defaultTicketFor =
-		(credentials.defaultTicketFor || []).find((item) =>
-			currentPath.includes(item.path)
-		)?.ticket || '';
-
-	return match ? match[1] : defaultTicketFor;
-}
 
 // Check if conventional commits should be used for current path
 function shouldUseConventionalCommits() {
@@ -47,7 +32,7 @@ function shouldUseConventionalCommits() {
 	});
 }
 
-async function generateCommit(diff, ticket, history = [], smartMode = false) {
+async function generateCommit(diff, branchName, history = [], smartMode = false) {
 	const provider = credentials.provider;
 	const model = credentials.model;
 	const apiKey = credentials.apiKey;
@@ -81,6 +66,11 @@ async function generateCommit(diff, ticket, history = [], smartMode = false) {
 	// Prepare context array
 	const contextArray = [diff];
 
+	// Add branch name to context
+	if (branchName) {
+		contextArray.push(`Current branch: ${branchName}`);
+	}
+
 	// Add smart context if enabled
 	if (smartMode) {
 		logger('[cyan]🧠 Gathering smart context...');
@@ -108,13 +98,29 @@ async function generateCommit(diff, ticket, history = [], smartMode = false) {
 				smartMode
 					? ' and additional smart context about the affected components and their relationships'
 					: ''
-			}.
+			}. If a branch name is provided, extract any ticket information from it to include in the commit message.
+
+			# Ticket Extraction from Branch Name
+			Look for ticket patterns in the branch name and extract them. Common patterns include:
+			- feature/TICKET-123 → TICKET-123
+			- feat/AB12-1234 → AB12-1234
+			- OP-1234 → OP-1234
+			- fix--TT-1234--finally → TT-1234
+			- hotfix/ASDF-1234--for-now-urgent → ASDF-1234
 
 			# CRITICAL Requirements
 			${
 				useConventionalCommits
 					? `- MUST use conventional commit format following the npm library @semantic-release standard
 			- You must decide which conventional commit type best applies to the changes
+			- For ticket formatting in conventional commits:
+			  * If ticket exists: feat(TICKET-123): description here
+			  * If no ticket but descriptive branch: feat(feature name): description here
+			  * If ticket and scope: feat(scope, TICKET-123): description here
+			- Examples of conventional commits with tickets:
+			  * feature/ASDF-1234 → feat(ASDF-1234): add user authentication
+			  * feature/some-new-feature → feat(new feature): implement dashboard
+			  * bugfix/TICKET-456 → fix(TICKET-456): resolve memory leak
 			- The commit message should be very short and straight to the point
 			- The commit description should provide meaningful technical context about WHY the changes were made, not just WHAT was changed
 			- AVOID stating obvious file changes like "updated package.json" or "modified index.js"
@@ -127,6 +133,13 @@ async function generateCommit(diff, ticket, history = [], smartMode = false) {
 			}`
 					: `- DO NOT use conventional commit prefixes like "feat:", "fix:", "chore:", "docs:", "style:", "refactor:", "test:", "build:", etc.
 			- Start the commit message directly with the action verb (e.g., "Add", "Update", "Fix", "Implement", "Refactor")
+			- For ticket formatting in non-conventional commits:
+			  * If ticket exists: TICKET-123: description here
+			  * If no ticket: description here
+			- Examples of non-conventional commits with tickets:
+			  * feature/ASDF-1234 → ASDF-1234: Add user authentication
+			  * feature/whatever → Add user authentication
+			  * bugfix/TICKET-456 → TICKET-456: Fix memory leak
 			- Write as a SENIOR DEVELOPER would - professional, concise, and technically accurate
 			- The commit message should be very short and straight to the point (max 50 characters)
 			- The commit description should provide meaningful technical context about WHY the changes were made, not just WHAT was changed
@@ -148,20 +161,20 @@ async function generateCommit(diff, ticket, history = [], smartMode = false) {
 		context: contextArray,
 		examples: useConventionalCommits ? [
 			`
-				COMMIT_MESSAGE: feat: implement async request batching for API calls
+				COMMIT_MESSAGE: feat(PERF-123): implement async request batching for API calls
 				COMMIT_DESCRIPTION: Reduces server load by combining multiple API requests into batched operations. This architectural change improves performance by 40% during peak usage and prevents rate limiting issues encountered in production.
 			`,
 			`
-				COMMIT_MESSAGE: fix: resolve memory leak in event listener cleanup
+				COMMIT_MESSAGE: fix(MEM-456): resolve memory leak in event listener cleanup
 				COMMIT_DESCRIPTION: Event listeners were not being properly removed on component unmount, causing memory consumption to grow over time. Implemented proper cleanup in lifecycle methods to ensure all listeners are detached when components are destroyed.
 			`
 		] : [
 			`
-				COMMIT_MESSAGE: Implement async request batching for API calls
+				COMMIT_MESSAGE: PERF-123: Implement async request batching for API calls
 				COMMIT_DESCRIPTION: Reduces server load by combining multiple API requests into batched operations. This architectural change improves performance by 40% during peak usage and prevents rate limiting issues encountered in production.
 			`,
 			`
-				COMMIT_MESSAGE: Fix memory leak in event listener cleanup
+				COMMIT_MESSAGE: MEM-456: Fix memory leak in event listener cleanup
 				COMMIT_DESCRIPTION: Event listeners were not being properly removed on component unmount, causing memory consumption to grow over time. Implemented proper cleanup in lifecycle methods to ensure all listeners are detached when components are destroyed.
 			`
 		]
@@ -169,26 +182,11 @@ async function generateCommit(diff, ticket, history = [], smartMode = false) {
 
 	const commit = result.split('\n').map((line) => line.trim());
 
-	commitMessage = '';
-	commitDescription = '';
+	let commitMessage = '';
+	let commitDescription = '';
 	commit.forEach((line) => {
 		if (line.startsWith('COMMIT_MESSAGE:')) {
-			const message = line.replace('COMMIT_MESSAGE:', '').trim();
-
-			// Handle conventional commits with tickets
-			if (useConventionalCommits && ticket?.length) {
-				// For conventional commits, add ticket after the type/scope part
-				// Example: feat: EXAMPLE-0000 add new feature
-				const match = message.match(/^(\w+(?:\([^)]+\))?:)\s*(.+)$/);
-				if (match) {
-					commitMessage = `${match[1]} ${ticket} ${match[2]}`;
-				} else {
-					// Fallback if regex doesn't match
-					commitMessage = `${ticket}: ${message}`;
-				}
-			} else {
-				commitMessage = `${ticket?.length ? `${ticket}: ` : ''}${message}`;
-			}
+			commitMessage = line.replace('COMMIT_MESSAGE:', '').trim();
 		} else if (line.startsWith('COMMIT_DESCRIPTION:')) {
 			commitDescription = line.replace('COMMIT_DESCRIPTION:', '').trim();
 		}
@@ -218,8 +216,6 @@ async function commitCommand(cmd) {
 			return;
 		}
 
-		const ticket = extractTicketFromBranch(branch);
-
 		if (!diff.length) {
 			logger(
 				'[red]❗ No changes to commit. If they are not staged, run [yellow]git add .[red] first or use the [yellow]--add[red] flag.'
@@ -236,7 +232,7 @@ async function commitCommand(cmd) {
 		while (!userSatisfied && attemptCount < 10) {
 			const { commitMessage, commitDescription } = await generateCommit(
 				diff,
-				ticket,
+				branch,
 				history,
 				cmd.smart
 			);
