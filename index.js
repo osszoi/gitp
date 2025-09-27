@@ -443,7 +443,9 @@ async function commitCommand(cmd) {
 			);
 			if (!commitMessage) return;
 			logger(`\n\n[green]Message: [white] ${commitMessage}`);
-			logger(`[green]Description: [white] ${commitDescription}`);
+			if (cmd.description) {
+				logger(`[green]Description: [white] ${commitDescription}`);
+			}
 
 			if (cmd.y) {
 				finalCommitMessage = commitMessage;
@@ -498,7 +500,9 @@ async function commitCommand(cmd) {
 			return;
 		}
 
-		let commitArgs = `${finalCommitMessage}\n\n${finalCommitDescription}`;
+		let commitArgs = cmd.description
+			? `${finalCommitMessage}\n\n${finalCommitDescription}`
+			: finalCommitMessage;
 
 		if (cmd.verify) {
 			commitArgs += ' --no-verify';
@@ -588,6 +592,7 @@ async function main() {
 		.option('--interactive', 'Interactive file selection (use with --add)', false)
 		.option('-y', 'Skip user confirmation', false)
 		.option('--smart', 'Enable smart context analysis for better commit messages', false)
+		.option('--description', 'Include commit description along with message', false)
 		.action(commitCommand);
 
 	program
